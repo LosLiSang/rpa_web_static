@@ -2,7 +2,7 @@
 
 import { eventTypeParams } from './config.js';
 import { addLog } from './utils.js';
-import { connectWebSocket, disconnectWebSocket, getWebsocketState } from './websocket.js';
+import { connectWebSocket, disconnectWebSocket, getWebsocketState, initWebsocketUrl } from './websocket.js';
 import { updateEventParams, addEvent, clearEvents, executeEvents, stopExecution, exportAtomicJson, exportJson, importJson } from './events.js';
 import { initControl, addControlListeners, removeControlListeners } from './control.js';
 import { startRecording, stopRecording, handleRecordingResult } from './recording.js';
@@ -10,6 +10,9 @@ import { showExportDialog } from './dialog.js';
 
 // 初始化函数
 function init() {
+    // 初始化WebSocket URL
+    initWebsocketUrl();
+
     // 获取DOM元素引用
     const connectButton = document.getElementById('connectButton');
     const addEventBtn = document.getElementById('addEventBtn');
