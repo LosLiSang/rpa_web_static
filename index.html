@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>远程桌面事件编排控制台</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="min-h-screen p-0">
+    <div class="w-full">
+        <main class="flex flex-col lg:flex-row min-h-screen">
+            <!-- 左侧事件编排区域 -->
+            <div class="w-full lg:w-1/3 bg-gray-900 p-4">
+                <div class="panel p-5 mb-6">
+                    <h2 class="text-xl font-semibold text-teal-300 mb-4 flex items-center">
+                        <i class="fas fa-list-ol mr-2"></i>事件编排
+                    </h2>
+
+                    <!-- 添加事件区域 -->
+                    <div class="panel p-4 mb-6">
+                        <h3 class="text-md font-medium text-gray-300 mb-3 flex items-center">
+                            <i class="fas fa-plus-circle mr-2"></i>添加事件
+                        </h3>
+                        <div class="flex flex-col md:flex-row gap-2 mb-3">
+                            <select id="eventType" class="input-field flex-1 p-2">
+                                <option value="keySingle">按下单个按键</option>
+                                <option value="keyCombo">执行组合按键</option>
+                                <option value="mouseClick">鼠标单击</option>
+                                <option value="mouseDoubleClick">鼠标双击</option>
+                                <option value="mouseDown">鼠标按下</option>
+                                <option value="mouseUp">鼠标松开</option>
+                                <option value="mouseMove">鼠标移动</option>
+                                <option value="mouseScroll">鼠标滚轮</option>
+                                <option value="mouseDrag">鼠标拖拽</option>
+                                <option value="delay">延迟</option>
+                            </select>
+                            <button id="addEventBtn" class="btn-primary font-medium py-2 px-4">
+                                <i class="fas fa-plus mr-2"></i>添加
+                            </button>
+                        </div>
+
+                        <!-- 动态参数输入区域 -->
+                        <div id="eventParams" class="space-y-3 mt-4">
+                            <!-- 这里会根据选择的事件类型动态生成输入框 -->
+                        </div>
+                    </div>
+
+                    <!-- 事件序列控制按钮 -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+                        <button id="exportJsonBtn" class="btn-secondary py-2">
+                            <i class="fas fa-file-export mr-2"></i>导出事件
+                        </button>
+                        <button id="exportAtomicJsonBtn" class="btn-warning py-2 hidden">
+                            <i class="fas fa-file-code mr-2"></i>导出原子事件
+                        </button>
+                        <label for="importJsonInput" class="btn-secondary py-2 text-center cursor-pointer">
+                            <i class="fas fa-file-import mr-2"></i>导入事件
+                        </label>
+                        <input type="file" id="importJsonInput" accept=".json" class="hidden">
+                        <button id="clearEventsBtn" class="btn-danger py-2">
+                            <i class="fas fa-trash-alt mr-2"></i>清空所有
+                        </button>
+                    </div>
+
+                    <!-- 事件列表 -->
+                    <div class="panel p-4 mb-6">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="text-md font-medium text-gray-300 flex items-center">
+                                <i class="fas fa-stream mr-2"></i>事件序列
+                            </h3>
+                            <span id="eventCount" class="text-sm text-gray-500">0 个事件</span>
+                        </div>
+                        <div id="eventList" class="space-y-3">
+                            <div class="text-center py-10 text-slate-500">
+                                <i class="fas fa-inbox text-3xl mb-2"></i>
+                                <p>暂无事件，请添加事件到序列</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 执行控制 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <button id="executeEventsBtn" class="btn-success py-3">
+                            <i class="fas fa-play mr-2"></i>执行事件序列
+                        </button>
+                        <button id="stopExecutionBtn" class="btn-danger py-3 hidden">
+                            <i class="fas fa-stop mr-2"></i>停止执行
+                        </button>
+                    </div>
+
+                    <!-- 执行状态 -->
+                    <div id="executionStatus" class="mt-4 p-4 panel hidden">
+                        <div class="flex justify-between items-center mb-2">
+                            <span class="text-sm text-gray-300">执行状态:</span>
+                            <span id="executionStatusText" class="text-sm font-medium">待机</span>
+                        </div>
+                        <div class="mt-3">
+                            <div class="progress-bar">
+                                <div id="executionProgress" class="progress-fill" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="mt-3 text-sm flex justify-between">
+                            <span>事件进度:</span>
+                            <span id="eventProgressText">0/0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 日志终端 -->
+                <div class="panel p-4">
+                    <h3 class="text-md font-medium text-gray-300 mb-3 flex items-center">
+                        <i class="fas fa-terminal mr-2"></i>执行日志
+                    </h3>
+                    <div id="terminal" class="terminal">
+                        <div class="terminal-line terminal-info">系统已就绪，等待连接...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧远程桌面区域 -->
+            <div class="w-full lg:w-2/3 bg-gray-900 p-4">
+                <div class="panel p-5">
+                    <div class="mb-6">
+                        <label for="websocketUrlInput" class="block text-sm font-medium text-gray-300 mb-2">
+                            <i class="fas fa-server mr-2"></i>WebSocket 服务器地址:
+                        </label>
+                        <div class="flex gap-2">
+                            <input type="text" id="websocketUrlInput" value="ws://localhost:3000/ws"
+                                class="input-field flex-1 p-3" placeholder="ws://your-server-address:port">
+                            <button id="connectButton" class="btn-primary font-semibold py-3 px-8 text-lg">
+                                <i class="fas fa-plug mr-2"></i>连接到服务器
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+                        <div id="statusContainer" class="flex items-center">
+                            <span id="statusDot" class="status-dot status-disconnected"></span>
+                            <span id="statusText" class="text-lg">状态: 未连接</span>
+                        </div>
+
+                        <!-- 录制控制按钮 -->
+                        <div class="flex gap-3">
+                            <button id="startRecordingBtn" class="btn-danger py-3 px-6 hidden">
+                                <i class="fas fa-record-vinyl mr-2"></i>开始录制
+                            </button>
+                            <button id="stopRecordingBtn" class="btn-danger py-3 px-6 hidden recording-indicator">
+                                <i class="fas fa-circle mr-2"></i>结束录制
+                            </button>
+                        </div>
+                    </div>
+
+                    <div
+                        class="relative border-4 border-slate-800 rounded-xl overflow-hidden shadow-2xl glow transition-all duration-500 w-full h-auto">
+                        <div id="mouseCoordDisplay"
+                            class="absolute left-2 top-2 z-10 bg-black bg-opacity-70 text-teal-300 text-xs px-3 py-1.5 rounded-lg pointer-events-none"
+                            style="display:none">
+                            <i class="fas fa-mouse-pointer mr-1"></i> (0, 0)
+                        </div>
+                        <img id="remoteDesktopImage" src="" alt="远程桌面图像流将在此显示" class="w-full h-auto object-contain"
+                            tabindex="0">
+                    </div>
+
+                    <p id="controlNote" class="text-sm text-slate-400 mt-4 text-center">
+                        <i class="fas fa-info-circle mr-2"></i>连接后，控制功能将被激活。录制功能可记录您的操作。
+                    </p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 使用ES模块方式导入JavaScript文件 -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
