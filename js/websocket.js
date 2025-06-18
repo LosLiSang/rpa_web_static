@@ -10,12 +10,6 @@ let reconnectAttempts = 0;
 let maxReconnectAttempts = 3;
 let reconnectInterval = 2000; // 2秒
 
-// 心跳机制配置
-let heartbeatInterval = 20000; // 心跳间隔 20 秒
-let heartbeatTimer = null;
-let lastPongTime = 0; // 上次收到心跳响应的时间
-let heartbeatTimeout = 30000; // 心跳超时时间 30 秒
-
 // 设置连接状态显示
 function setStatus(message, connectedStatus) {
     const statusText = document.getElementById('statusText');
@@ -55,61 +49,6 @@ function sendControlCommand(command) {
         console.log('Sent command:', command);
     } else {
         console.warn('WebSocket not connected. Command not sent:', command);
-    }
-}
-
-// 启动心跳检测
-function startHeartbeat() {
-    // 清除可能已存在的心跳定时器
-    stopHeartbeat();
-    
-    // 启动新的心跳
-    lastPongTime = Date.now(); // 初始化最后一次心跳响应时间
-    console.log('启动WebSocket心跳检测');
-    
-    heartbeatTimer = setInterval(() => {
-        // 检查最后一次响应是否超时
-        const now = Date.now();
-        if (now - lastPongTime > heartbeatTimeout) {
-            console.warn('心跳超时，主动断开重连');
-            addLog('心跳响应超时，尝试重新连接', 'warning');
-            
-            // 主动关闭连接并重新连接
-            if (websocket) {
-                connectIntentional = false; // 标记为非主动断开，将触发重连机制
-                try {
-                    websocket.close(1000, "心跳超时");
-                } catch (e) {
-                    console.error('关闭超时连接时出错:', e);
-                }
-            }
-            
-            stopHeartbeat(); // 停止心跳
-            return;
-        }
-        
-        // 发送心跳请求
-        if (websocket && websocket.readyState === WebSocket.OPEN) {
-            try {
-                websocket.send('ping');
-                console.log('发送心跳: ping');
-            } catch (e) {
-                console.error('发送心跳消息失败:', e);
-                stopHeartbeat();
-            }
-        } else {
-            console.warn('WebSocket未连接，停止心跳');
-            stopHeartbeat();
-        }
-    }, heartbeatInterval);
-}
-
-// 停止心跳检测
-function stopHeartbeat() {
-    if (heartbeatTimer) {
-        clearInterval(heartbeatTimer);
-        heartbeatTimer = null;
-        console.log('停止WebSocket心跳检测');
     }
 }
 
@@ -178,9 +117,6 @@ function connectWebSocket(onConnected, onMessageHandler, addControlListeners, re
         // 重置重连计数
         reconnectAttempts = 0;
         
-        // 启动心跳检测
-        startHeartbeat();
-        
         // 发送初始化消息
         try {
             websocket.send(JSON.stringify({ type: "init", clientInfo: { type: "web-client", version: "1.0" } }));
@@ -194,13 +130,6 @@ function connectWebSocket(onConnected, onMessageHandler, addControlListeners, re
 
     websocket.onmessage = (event) => {
         try {
-            // 处理心跳检测响应
-            if (event.data === 'pong') {
-                console.log('收到心跳响应');
-                lastPongTime = Date.now(); // 更新最后一次收到响应的时间
-                return;
-            }
-            
             // 处理不同类型的消息
             if (typeof event.data === 'string') {
                 if (event.data.startsWith('data:image/')) {
@@ -257,16 +186,10 @@ function connectWebSocket(onConnected, onMessageHandler, addControlListeners, re
         remoteDesktopImage.src = '';
         removeControlListeners();
         addLog(`连接错误: ${error.message || '未知错误'}`, 'error');
-        
-        // 停止心跳
-        stopHeartbeat();
     };
 
     websocket.onclose = (event) => {
         console.log('WebSocket 连接已关闭。 Code:', event.code, 'Reason:', event.reason);
-        
-        // 清除心跳定时器
-        stopHeartbeat();
         
         // 处理不同的关闭情况
         if (!connectIntentional) {
@@ -311,9 +234,6 @@ function connectWebSocket(onConnected, onMessageHandler, addControlListeners, re
 
 // 断开WebSocket连接
 function disconnectWebSocket() {
-    // 停止心跳检测
-    stopHeartbeat();
-
     const connectButton = document.getElementById('connectButton');
 
     if (websocket && (websocket.readyState === WebSocket.OPEN || websocket.readyState === WebSocket.CONNECTING)) {
