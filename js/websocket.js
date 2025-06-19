@@ -114,15 +114,6 @@ function connectWebSocket(onConnected, onMessageHandler, addControlListeners, re
         remoteDesktopImage.alt = '等待图像数据...';
         remoteDesktopImage.src = '';
         
-        // 重置重连计数
-        reconnectAttempts = 0;
-        
-        // 发送初始化消息
-        try {
-            websocket.send(JSON.stringify({ type: "init", clientInfo: { type: "web-client", version: "1.0" } }));
-        } catch (e) {
-            console.warn('发送初始化消息失败:', e);
-        }
         
         if (onConnected) onConnected();
         addControlListeners();

@@ -4,8 +4,15 @@
   "description": "远程桌面事件编排控制台",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "build": "tsc --project tsconfig.json",
+    "watch": "tsc --project tsconfig.json -w",
+    "dev": "tsc --project tsconfig.json -w ; node server.js"
   },
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.19.1",
+    "typescript": "^4.9.5"
+  }
 }
