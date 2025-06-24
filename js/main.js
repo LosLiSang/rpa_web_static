@@ -3,7 +3,7 @@
 import { eventTypeParams } from './config.js';
 import { addLog } from './utils.js';
 import { connectWebSocket, disconnectWebSocket, getWebsocketState, initWebsocketUrl } from './websocket.js';
-import { updateEventParams, addEvent, clearEvents, executeEvents, stopExecution, exportAtomicJson, exportJson, importJson } from './events.js';
+import { updateEventParams, addEvent, clearEvents, executeEvents, stopExecution, exportAtomicJson, exportJson, importJson, batchImportJson } from './events.js';
 import { initControl, addControlListeners, removeControlListeners } from './control.js';
 import { startRecording, stopRecording, handleRecordingResult } from './recording.js';
 import { showExportDialog } from './dialog.js';
@@ -25,6 +25,7 @@ function init() {
     const exportJsonBtn = document.getElementById('exportJsonBtn');
     const exportAtomicJsonBtn = document.getElementById('exportAtomicJsonBtn');
     const importJsonInput = document.getElementById('importJsonInput');
+    const batchImportJsonInput = document.getElementById('batchImportJsonInput');
     
     // 初始化控制功能
     initControl();
@@ -71,11 +72,20 @@ function init() {
     });
     exportAtomicJsonBtn.addEventListener('click', exportAtomicJson);
     
-    // 导入JSON
+    // 导入单个JSON
     importJsonInput.addEventListener('change', function() {
         const file = this.files[0];
         if (file) {
             importJson(file);
+            this.value = ''; // 清空input，方便连续导入
+        }
+    });
+    
+    // 批量导入JSON
+    batchImportJsonInput.addEventListener('change', function() {
+        const files = this.files;
+        if (files && files.length > 0) {
+            batchImportJson(files);
             this.value = ''; // 清空input，方便连续导入
         }
     });

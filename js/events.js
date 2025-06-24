@@ -802,7 +802,42 @@ function convertAtomicToHighLevelEvents(atomicEvents) {
     return highLevelEvents;
 }
 
-// 导入JSON
+// 处理导入的JSON数据
+function processJsonData(jsonData, fileName = '') {
+    try {
+        let importedEvents = [];
+        let isAtomicImport = false;
+        
+        // 判断数据格式
+        if (Array.isArray(jsonData.events)) {
+            // 高级事件格式 {version, events}
+            importedEvents = jsonData.events;
+        } else if (Array.isArray(jsonData)) {
+            // 可能是直接的高级事件数组或原子事件数组
+            if (jsonData.length > 0 && isAtomicEvent(jsonData[0])) {
+                // 原子事件
+                isAtomicImport = true;
+                importedEvents = convertAtomicToHighLevelEvents(jsonData);
+            } else {
+                // 高级事件
+                importedEvents = jsonData;
+            }
+        } else {
+            throw new Error('导入的JSON格式不正确');
+        }
+        
+        return {
+            events: importedEvents,
+            isAtomicImport,
+            count: importedEvents.length,
+            fileName
+        };
+    } catch (err) {
+        throw err;
+    }
+}
+
+// 导入单个JSON文件
 function importJson(file) {
     if (!file) return;
 
@@ -810,50 +845,93 @@ function importJson(file) {
     reader.onload = function (e) {
         try {
             const data = JSON.parse(e.target.result);
-            let importedEvents = [];
-            let isAtomicImport = false;
-            
-            // 判断数据格式
-            if (Array.isArray(data.events)) {
-                // 高级事件格式 {version, events}
-                importedEvents = data.events;
-            } else if (Array.isArray(data)) {
-                // 可能是直接的高级事件数组或原子事件数组
-                if (data.length > 0 && isAtomicEvent(data[0])) {
-                    // 原子事件
-                    isAtomicImport = true;
-                    importedEvents = convertAtomicToHighLevelEvents(data);
-                } else {
-                    // 高级事件
-                    importedEvents = data;
-                }
-            } else {
-                alert('导入的JSON格式不正确');
-                return;
-            }
+            const processedData = processJsonData(data, file.name);
             
             if (confirm('是否要替换当前事件列表？点击"确定"替换，点击"取消"追加。')) {
-                events = importedEvents;
+                events = processedData.events;
             } else {
-                events = events.concat(importedEvents);
+                events = events.concat(processedData.events);
             }
 
             updateEventList();
             updateEventCount();
             updateEventParams();
             
-            if (isAtomicImport) {
-                addLog(`成功导入并转换为高级事件，共 ${importedEvents.length} 个事件`, 'success');
+            if (processedData.isAtomicImport) {
+                addLog(`成功导入并转换为高级事件，共 ${processedData.count} 个事件`, 'success');
             } else {
-                addLog(`成功导入事件序列，共 ${importedEvents.length} 个事件`, 'success');
+                addLog(`成功导入事件序列 "${processedData.fileName}"，共 ${processedData.count} 个事件`, 'success');
             }
         } catch (err) {
             alert('导入失败: ' + err.message);
-            addLog(`导入失败: ${err.message}`, 'error');
+            addLog(`导入文件 "${file.name}" 失败: ${err.message}`, 'error');
         }
     };
 
     reader.readAsText(file);
+}
+
+// 批量导入JSON文件
+function batchImportJson(files) {
+    if (!files || files.length === 0) return;
+
+    // 询问是替换还是追加
+    const shouldReplace = confirm('是否要替换当前事件列表？点击"确定"替换，点击"取消"追加。');
+    
+    // 如果选择替换，先清空当前事件
+    if (shouldReplace) {
+        events = [];
+    }
+    
+    const totalFiles = files.length;
+    let processedFiles = 0;
+    let successfulImports = 0;
+    let totalEventsImported = 0;
+    
+    addLog(`开始批量导入 ${totalFiles} 个文件...`, 'info');
+    
+    // 创建一个处理文件的函数，它返回一个Promise
+    function processFile(file) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    const processedData = processJsonData(data, file.name);
+                    
+                    // 将处理后的事件添加到events数组中
+                    events = events.concat(processedData.events);
+                    
+                    // 更新统计信息
+                    successfulImports++;
+                    totalEventsImported += processedData.events.length;
+                    
+                    addLog(`成功导入 "${file.name}"，包含 ${processedData.events.length} 个事件`, 'success');
+                    resolve(true);
+                } catch (err) {
+                    addLog(`导入文件 "${file.name}" 失败: ${err.message}`, 'error');
+                    resolve(false);
+                }
+            };
+            
+            reader.onerror = function() {
+                addLog(`读取文件 "${file.name}" 时出错`, 'error');
+                resolve(false);
+            };
+            
+            reader.readAsText(file);
+        });
+    }
+    
+    // 使用Promise.all来处理所有文件
+    const promises = Array.from(files).map(processFile);
+    Promise.all(promises).then(() => {
+        updateEventList();
+        updateEventCount();
+        updateEventParams();
+        
+        addLog(`批量导入完成：成功导入 ${successfulImports}/${totalFiles} 个文件，总共 ${totalEventsImported} 个事件`, 'info');
+    });
 }
 
 // 获取直接控制状态
@@ -871,5 +949,6 @@ export {
     exportAtomicJson,
     exportJson,
     importJson,
+    batchImportJson,
     getDirectControlStatus
 };

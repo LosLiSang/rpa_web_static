@@ -54,11 +54,14 @@
                         </button>
                         <button id="exportAtomicJsonBtn" class="btn-warning py-2 hidden">
                             <i class="fas fa-file-code mr-2"></i>导出原子事件
-                        </button>
-                        <label for="importJsonInput" class="btn-secondary py-2 text-center cursor-pointer">
-                            <i class="fas fa-file-import mr-2"></i>导入事件
+                        </button>                        <label for="importJsonInput" class="btn-secondary py-2 text-center cursor-pointer">
+                            <i class="fas fa-file-import mr-2"></i>导入单个文件
                         </label>
                         <input type="file" id="importJsonInput" accept=".json" class="hidden">
+                        <label for="batchImportJsonInput" class="btn-info py-2 text-center cursor-pointer">
+                            <i class="fas fa-folder-open mr-2"></i>批量导入
+                        </label>
+                        <input type="file" id="batchImportJsonInput" accept=".json" multiple class="hidden">
                         <button id="clearEventsBtn" class="btn-danger py-2">
                             <i class="fas fa-trash-alt mr-2"></i>清空所有
                         </button>
