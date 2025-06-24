@@ -342,6 +342,12 @@ async function executeEvents(removeControlListeners) {
     executionIndex = 0;
     directControlEnabled = false;
     addLog(`开始执行事件序列 (共 ${events.length} 个事件)`, 'success');
+    
+    // 如果提供了removeControlListeners函数，则调用它来移除控制监听器
+    if (typeof removeControlListeners === 'function') {
+        removeControlListeners();
+        addLog('已暂时禁用直接控制', 'info');
+    }
 
     // 更新UI
     const executeEventsBtn = document.getElementById('executeEventsBtn');

@@ -93,39 +93,99 @@ function handleMouseMove(event) {
 function handleKeyDown(event) {
     if (!getDirectControlStatus()) return;
     event.preventDefault();
-    const key = mapKeyToCode(event.key);
+    
+    // 优先使用event.code获取物理键位信息，特别是对修饰键
+    // 如果code不可用或无法映射，则回退到event.key
+    let key;
+    if (event.code && (event.code.startsWith('Control') || 
+                       event.code.startsWith('Shift') || 
+                       event.code.startsWith('Alt') || 
+                       event.code.startsWith('Meta'))) {
+        key = mapKeyToCode(event.code);
+        console.log(`修饰键按下 - 使用code: ${event.code} -> ${key}`);
+    } else {
+        key = mapKeyToCode(event.key);
+    }
+    
     const modKeys = getModifiers(event);
 
-    // 过滤掉key数组中属于modKey的内容
-    const modKeySet = new Set(["lctrl", "lshift", "lalt", "lwin", "alt",
-    "rctrl", "rshift", "ralt", "rwin", "meta"]);
-    const filteredKey = (modKeySet.has(key)) ? [] : [key];
-
-    sendControlCommand({
-        "keyPress": {
-            "modKey": modKeys,
-            "key": filteredKey
-        }
-    });
+    // 过滤掉key数组中属于modKey的内容 - 确保与config.js中定义一致
+    const modKeySet = new Set([
+        "lctrl", "lshift", "lalt", "lwin", 
+        "rctrl", "rshift", "ralt", "rwin", 
+        // 兼容性名称
+        "alt", "meta"
+    ]);
+    
+    // 如果是修饰键被按下，需要特殊处理
+    if (modKeySet.has(key)) {
+        // 直接发送修饰键按下命令
+        console.log(`修饰键按下: ${key}`, event);
+        sendControlCommand({
+            "keyPress": {
+                "modKey": [key],  // 将按下的修饰键放入modKey数组
+                "key": []
+            }
+        });
+    } else {
+        // 非修饰键正常处理
+        console.log(`普通键按下: ${key}，修饰键状态:`, modKeys);
+        sendControlCommand({
+            "keyPress": {
+                "modKey": modKeys,
+                "key": [key]
+            }
+        });
+    }
 }
 
 function handleKeyUp(event) {
     if (!getDirectControlStatus()) return;
     event.preventDefault();
-    const key = mapKeyToCode(event.key);
+    
+    // 优先使用event.code获取物理键位信息，特别是对修饰键
+    // 如果code不可用或无法映射，则回退到event.key
+    let key;
+    if (event.code && (event.code.startsWith('Control') || 
+                       event.code.startsWith('Shift') || 
+                       event.code.startsWith('Alt') || 
+                       event.code.startsWith('Meta'))) {
+        key = mapKeyToCode(event.code);
+        console.log(`修饰键松开 - 使用code: ${event.code} -> ${key}`);
+    } else {
+        key = mapKeyToCode(event.key);
+    }
+    
     const modKeys = getModifiers(event);
 
-    // 过滤掉key数组中属于modKey的内容
-    const modKeySet = new Set(["lctrl", "lshift", "lalt", "lwin", "alt",
-    "rctrl", "rshift", "ralt", "rwin", "meta"]);
-    const filteredKey = (modKeySet.has(key)) ? [] : [key];
-
-    sendControlCommand({
-        "keyRelease": {
-            "modKey": modKeys,
-            "key": filteredKey
-        }
-    });
+    // 过滤掉key数组中属于modKey的内容 - 确保与config.js中定义一致
+    const modKeySet = new Set([
+        "lctrl", "lshift", "lalt", "lwin", 
+        "rctrl", "rshift", "ralt", "rwin", 
+        // 兼容性名称
+        "alt", "meta"
+    ]);
+    
+    // 如果是修饰键被松开，需要特殊处理
+    if (modKeySet.has(key)) {
+        // 直接发送修饰键松开命令
+        console.log(`修饰键松开: ${key}`, event);
+        sendControlCommand({
+            "keyRelease": {
+                "modKey": [key],  // 将松开的修饰键放入modKey数组
+                "key": []
+            }
+        });
+    } else {
+        // 非修饰键正常处理
+        console.log(`普通键松开: ${key}，修饰键状态:`, modKeys);
+        sendControlCommand({
+            "keyRelease": {
+                "modKey": modKeys,
+                "key": [key]
+            }
+        });
+    }
 }
 
 function handleMouseDown(event) {
@@ -160,6 +220,30 @@ function handleContextMenu(event) {
     event.preventDefault();
 }
 
+// 创建一个处理失去焦点事件的函数
+function handleBlur() {
+    if (!getDirectControlStatus()) return;
+    
+    console.log('远程桌面图像失去焦点，释放所有按键');
+    
+    // 释放所有可能的修饰键
+    const modKeys = ["lctrl", "lshift", "lalt", "lwin", "rctrl", "rshift", "ralt", "rwin"];
+    modKeys.forEach(key => {
+        sendControlCommand({
+            "keyRelease": {
+                "modKey": [key],
+                "key": []
+            }
+        });
+    });
+    
+    // 释放所有可能的鼠标按钮
+    const mouseButtons = ["mleft", "mright", "mmiddle"];
+    mouseButtons.forEach(button => {
+        sendControlCommand({ "mouseRelease": [button] });
+    });
+}
+
 function addControlListeners() {
     const remoteDesktopImage = document.getElementById('remoteDesktopImage');
     remoteDesktopImage.addEventListener('mousemove', handleMouseMove);
@@ -171,6 +255,7 @@ function addControlListeners() {
     remoteDesktopImage.addEventListener('mouseenter', () => remoteDesktopImage.focus());
     remoteDesktopImage.addEventListener('keydown', handleKeyDown);
     remoteDesktopImage.addEventListener('keyup', handleKeyUp);
+    remoteDesktopImage.addEventListener('blur', handleBlur);  // 添加失去焦点事件
     
     // 鼠标离开时隐藏坐标
     remoteDesktopImage.addEventListener('mouseleave', () => {
@@ -200,6 +285,10 @@ function removeControlListeners() {
     remoteDesktopImage.removeEventListener('mouseenter', () => remoteDesktopImage.focus());
     remoteDesktopImage.removeEventListener('keydown', handleKeyDown);
     remoteDesktopImage.removeEventListener('keyup', handleKeyUp);
+    remoteDesktopImage.removeEventListener('blur', handleBlur);
+    
+    // 在移除监听器时，确保释放所有按键
+    handleBlur();
     
     if (mouseMoveInterval) {
         clearInterval(mouseMoveInterval);

@@ -76,10 +76,13 @@ const eventTypeParams = {
     ]
 };
 
-// 修饰键字符串集合
+// 修饰键字符串集合 - 基于服务器端Rust代码定义
+// lctrl=0x80, lshift=0x81, lalt=0x82, lwin=0x83, rctrl=0x84, rshift=0x85, ralt=0x86, rwin=0x87
 const modKeySet = new Set([
-    "lctrl", "lshift", "lalt", "lwin", "alt",
-    "rctrl", "rshift", "ralt", "rwin", "meta"
+    "lctrl", "lshift", "lalt", "lwin", 
+    "rctrl", "rshift", "ralt", "rwin", 
+    // 兼容性名称
+    "alt", "meta"
 ]);
 
 // 鼠标移动间隔时间配置
