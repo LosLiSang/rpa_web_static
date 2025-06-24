@@ -344,6 +344,27 @@ body {
     }
 }
 
+/* 批量选择相关样式 */
+.selected-item {
+    border: 2px solid var(--info) !important;
+    background-color: rgba(59, 130, 246, 0.15) !important;
+}
+
+.select-toolbar {
+    transition: opacity 0.3s, height 0.3s;
+}
+
+#selectModeToggleBtn.active {
+    background-color: var(--info);
+    color: white;
+}
+
+/* 禁用拖动手柄 */
+.selected-item .drag-handle {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
 /* 响应式调整 */
 @media (max-width: 1024px) {
     main {

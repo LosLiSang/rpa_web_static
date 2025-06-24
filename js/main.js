@@ -3,7 +3,7 @@
 import { eventTypeParams } from './config.js';
 import { addLog } from './utils.js';
 import { connectWebSocket, disconnectWebSocket, getWebsocketState, initWebsocketUrl } from './websocket.js';
-import { updateEventParams, addEvent, clearEvents, executeEvents, stopExecution, exportAtomicJson, exportJson, importJson, batchImportJson } from './events.js';
+import { updateEventParams, addEvent, clearEvents, executeEvents, stopExecution, exportAtomicJson, exportJson, importJson, batchImportJson, toggleSelectMode, batchDeleteEvents } from './events.js';
 import { initControl, addControlListeners, removeControlListeners } from './control.js';
 import { startRecording, stopRecording, handleRecordingResult } from './recording.js';
 import { showExportDialog } from './dialog.js';
@@ -89,6 +89,14 @@ function init() {
             this.value = ''; // 清空input，方便连续导入
         }
     });
+    
+    // 批量选择模式切换
+    const selectModeToggleBtn = document.getElementById('selectModeToggleBtn');
+    selectModeToggleBtn.addEventListener('click', toggleSelectMode);
+    
+    // 批量删除按钮
+    const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+    batchDeleteBtn.addEventListener('click', batchDeleteEvents);
     
     // 添加初始日志
     addLog('远程桌面事件编排控制台已启动', 'success');

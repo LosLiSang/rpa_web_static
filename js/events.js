@@ -9,6 +9,8 @@ let isExecuting = false;
 let executionIndex = 0;
 let executionTimer = null;
 let directControlEnabled = true;
+let selectedEvents = new Set(); // 存储已选中的事件索引
+let selectMode = false; // 是否处于批量选择模式
 
 // 初始化事件参数输入区域
 function updateEventParams(eventParamsData = null) {
@@ -152,18 +154,30 @@ function updateEventList() {
 
     events.forEach((event, index) => {
         const div = document.createElement('div');
-        div.className = 'event-item bg-slate-800 p-4 rounded-lg flex items-center justify-between';
+        // 添加选中状态的样式
+        const isSelected = selectedEvents.has(index);
+        div.className = `event-item bg-slate-800 p-4 rounded-lg flex items-center justify-between ${isSelected ? 'selected-item' : ''}`;
         div.setAttribute('data-index', index);
-        div.setAttribute('draggable', 'true');
+        div.setAttribute('draggable', selectMode ? 'false' : 'true'); // 选择模式下禁用拖拽
 
         const content = document.createElement('div');
-        content.className = 'flex-1 flex items-center';
-
-        // 序号
-        const indexSpan = document.createElement('span');
-        indexSpan.textContent = `${index + 1}.`;
-        indexSpan.className = 'text-teal-400 font-bold mr-3 w-6 text-center';
-        content.appendChild(indexSpan);
+        content.className = 'flex-1 flex items-center';        // 选择框或序号
+        if (selectMode) {
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.className = 'mr-3 h-5 w-5 cursor-pointer';
+            checkbox.checked = selectedEvents.has(index);
+            checkbox.onclick = (e) => {
+                e.stopPropagation(); // 防止冒泡触发整行点击
+                toggleEventSelection(index);
+            };
+            content.appendChild(checkbox);
+        } else {
+            const indexSpan = document.createElement('span');
+            indexSpan.textContent = `${index + 1}.`;
+            indexSpan.className = 'text-teal-400 font-bold mr-3 w-6 text-center';
+            content.appendChild(indexSpan);
+        }
 
         // 图标
         const icon = document.createElement('div');
@@ -185,30 +199,42 @@ function updateEventList() {
 
         // 控制按钮
         const controls = document.createElement('div');
-        controls.className = 'flex items-center space-x-2';
+        controls.className = 'flex items-center space-x-2';        // 在选择模式下只显示选择器，不显示其他控制按钮
+        if (!selectMode) {
+            const dragHandle = document.createElement('span');
+            dragHandle.className = 'drag-handle text-slate-500 px-2 py-1';
+            dragHandle.innerHTML = '<i class="fas fa-grip-lines"></i>';
 
-        const dragHandle = document.createElement('span');
-        dragHandle.className = 'drag-handle text-slate-500 px-2 py-1';
-        dragHandle.innerHTML = '<i class="fas fa-grip-lines"></i>';
+            const editBtn = document.createElement('button');
+            editBtn.className = 'text-slate-300 hover:text-blue-400 transition';
+            editBtn.innerHTML = '<i class="fas fa-edit"></i>';
+            editBtn.title = '编辑';
+            editBtn.onclick = (e) => {
+                e.stopPropagation();
+                editEvent(index);
+            };
 
-        const editBtn = document.createElement('button');
-        editBtn.className = 'text-slate-300 hover:text-blue-400 transition';
-        editBtn.innerHTML = '<i class="fas fa-edit"></i>';
-        editBtn.title = '编辑';
-        editBtn.onclick = () => editEvent(index);
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'text-slate-300 hover:text-red-400 transition';
+            deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
+            deleteBtn.title = '删除';
+            deleteBtn.onclick = (e) => {
+                e.stopPropagation();
+                deleteEvent(index);
+            };
 
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'text-slate-300 hover:text-red-400 transition';
-        deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i>';
-        deleteBtn.title = '删除';
-        deleteBtn.onclick = () => deleteEvent(index);
-
-        controls.appendChild(dragHandle);
-        controls.appendChild(editBtn);
-        controls.appendChild(deleteBtn);
-
-        div.appendChild(content);
+            controls.appendChild(dragHandle);
+            controls.appendChild(editBtn);
+            controls.appendChild(deleteBtn);
+        }        div.appendChild(content);
         div.appendChild(controls);
+        
+        // 在选择模式下，点击整个事件项切换选择状态
+        if (selectMode) {
+            div.style.cursor = 'pointer';
+            div.onclick = () => toggleEventSelection(index);
+        }
+        
         eventList.appendChild(div);
     });
 
@@ -217,6 +243,9 @@ function updateEventList() {
 
 // 拖拽排序实现
 function makeEventListSortable() {
+    // 选择模式下不启用拖拽排序
+    if (selectMode) return;
+    
     const eventList = document.getElementById('eventList');
     let dragSrcIndex = null;
     const items = eventList.querySelectorAll('.event-item');
@@ -442,7 +471,7 @@ async function executeEventAtomically(event) {
             break;
 
         case 'mouseClick':
-            if (event.params.x !== undefined && event.params.y !== undefined)
+            if (event.params.x !== undefined && event.params.y !== undefined && event.params.x != 0 && event.params.y != 0)
                 sendControlCommand({ mouseMove: { x: Number(event.params.x), y: Number(event.params.y) } });
             sendControlCommand({ mousePress: [event.params.button] });
             await sleep(100);
@@ -451,7 +480,7 @@ async function executeEventAtomically(event) {
 
         case 'mouseDoubleClick':
             for (let i = 0; i < 2; i++) {
-                if (event.params.x !== undefined && event.params.y !== undefined)
+                if (event.params.x !== undefined && event.params.y !== undefined && event.params.x != 0 && event.params.y != 0)
                     sendControlCommand({ mouseMove: { x: Number(event.params.x), y: Number(event.params.y) } });
                 sendControlCommand({ mousePress: [event.params.button] });
                 await sleep(100);
@@ -461,7 +490,7 @@ async function executeEventAtomically(event) {
             break;
 
         case 'mouseDown':
-            if (event.params.x !== undefined && event.params.y !== undefined)
+            if (event.params.x !== undefined && event.params.y !== undefined && event.params.x != 0 && event.params.y != 0)
                 sendControlCommand({ mouseMove: { x: Number(event.params.x), y: Number(event.params.y) } });
             sendControlCommand({ mousePress: [event.params.button] });
             break;
@@ -945,6 +974,95 @@ function getDirectControlStatus() {
     return directControlEnabled;
 }
 
+// 批量删除事件
+function deleteSelectedEvents() {
+    if (selectedEvents.size === 0) {
+        alert('请先选择要删除的事件');
+        return;
+    }
+
+    if (confirm(`确认删除选中的 ${selectedEvents.size} 个事件?`)) {
+        // 按照从大到小的顺序排序索引，以便正确删除
+        const sortedIndices = Array.from(selectedEvents).sort((a, b) => b - a);
+        sortedIndices.forEach(index => {
+            events.splice(index, 1);
+        });
+
+        selectedEvents.clear();
+        updateEventList();
+        updateEventCount();
+        updateEventParams();
+        addLog(`删除了 ${sortedIndices.length} 个事件`, 'warning');
+    }
+}
+
+// 切换批量选择模式
+function toggleSelectMode() {
+    selectMode = !selectMode;
+    selectedEvents.clear(); // 清空已选择的事件
+    updateEventList(); // 更新事件列表UI
+    
+    // 更新批量操作按钮状态
+    const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+    const selectModeToggleBtn = document.getElementById('selectModeToggleBtn');
+    
+    if (selectMode) {
+        selectModeToggleBtn.classList.add('active');
+        selectModeToggleBtn.innerHTML = '<i class="fas fa-times mr-2"></i>取消选择';
+        batchDeleteBtn.classList.remove('hidden');
+        addLog('已进入批量选择模式', 'info');
+    } else {
+        selectModeToggleBtn.classList.remove('active');
+        selectModeToggleBtn.innerHTML = '<i class="fas fa-check-square mr-2"></i>批量选择';
+        batchDeleteBtn.classList.add('hidden');
+        addLog('已退出批量选择模式', 'info');
+    }
+}
+
+// 切换事件选中状态
+function toggleEventSelection(index) {
+    if (selectedEvents.has(index)) {
+        selectedEvents.delete(index);
+    } else {
+        selectedEvents.add(index);
+    }
+    updateEventList();
+    
+    // 更新删除按钮状态
+    const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+    if (selectedEvents.size > 0) {
+        batchDeleteBtn.removeAttribute('disabled');
+        batchDeleteBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+    } else {
+        batchDeleteBtn.setAttribute('disabled', 'true');
+        batchDeleteBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
+}
+
+// 批量删除选中的事件
+function batchDeleteEvents() {
+    if (selectedEvents.size === 0) return;
+    
+    if (confirm(`确认删除选中的 ${selectedEvents.size} 个事件?`)) {
+        // 将选中的索引转换为数组并降序排列，这样从大到小删除不会影响索引
+        const indexesToDelete = Array.from(selectedEvents).sort((a, b) => b - a);
+        
+        for (const index of indexesToDelete) {
+            events.splice(index, 1);
+        }
+        
+        addLog(`批量删除了 ${selectedEvents.size} 个事件`, 'warning');
+        selectedEvents.clear();
+        updateEventList();
+        updateEventCount();
+        
+        // 如果没有事件了，退出选择模式
+        if (events.length === 0) {
+            toggleSelectMode();
+        }
+    }
+}
+
 // 导出模块
 export {
     updateEventParams,
@@ -956,5 +1074,8 @@ export {
     exportJson,
     importJson,
     batchImportJson,
-    getDirectControlStatus
+    getDirectControlStatus,
+    toggleSelectMode,
+    toggleEventSelection,
+    batchDeleteEvents
 };

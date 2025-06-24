@@ -65,15 +65,22 @@
                         <button id="clearEventsBtn" class="btn-danger py-2">
                             <i class="fas fa-trash-alt mr-2"></i>清空所有
                         </button>
-                    </div>
-
-                    <!-- 事件列表 -->
+                    </div>                    <!-- 事件列表 -->
                     <div class="panel p-4 mb-6">
                         <div class="flex justify-between items-center mb-3">
                             <h3 class="text-md font-medium text-gray-300 flex items-center">
                                 <i class="fas fa-stream mr-2"></i>事件序列
                             </h3>
                             <span id="eventCount" class="text-sm text-gray-500">0 个事件</span>
+                        </div>
+                        <!-- 批量操作工具栏 -->
+                        <div class="flex justify-between items-center mb-3 select-toolbar">
+                            <button id="selectModeToggleBtn" class="btn-secondary py-1 px-2 text-sm">
+                                <i class="fas fa-check-square mr-2"></i>批量选择
+                            </button>
+                            <button id="batchDeleteBtn" class="btn-danger py-1 px-2 text-sm hidden opacity-50 cursor-not-allowed" disabled>
+                                <i class="fas fa-trash-alt mr-2"></i>批量删除
+                            </button>
                         </div>
                         <div id="eventList" class="space-y-3">
                             <div class="text-center py-10 text-slate-500">
