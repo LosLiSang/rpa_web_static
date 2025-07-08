@@ -74,7 +74,7 @@ check_and_install_node
 check_and_install_packages
 
 echo "正在启动本地服务器..."
-echo "服务器将在 http://localhost:3456 上运行"
+echo "服务器将在 http://localhost:34567上运行"
 echo "请在浏览器中打开此地址访问应用"
 echo "-----------------------------------------------"
 

@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,6 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="styles.css">
 </head>
+
 <body class="min-h-screen p-0">
     <div class="w-full">
         <main class="flex flex-col lg:flex-row min-h-screen">
@@ -25,15 +27,13 @@
                         </h3>
                         <div class="flex flex-col md:flex-row gap-2 mb-3">
                             <select id="eventType" class="input-field flex-1 p-2">
-                                <option value="keySingle">按下单个按键</option>
-                                <option value="keyCombo">执行组合按键</option>
+                                <option value="singleKeyEnter">按下单个按键</option>
+                                <option value="combindKeyEnter">执行组合按键</option>
                                 <option value="mouseClick">鼠标单击</option>
-                                <option value="mouseDoubleClick">鼠标双击</option>
-                                <option value="mouseDown">鼠标按下</option>
-                                <option value="mouseUp">鼠标松开</option>
+                                <option value="stringEnter">输入Ascii可打印字符串</option>
+                                <option value="stringEnterGb2312">输入GB2312编码字符串</option>
                                 <option value="mouseMove">鼠标移动</option>
                                 <option value="mouseScroll">鼠标滚轮</option>
-                                <option value="mouseDrag">鼠标拖拽</option>
                                 <option value="delay">延迟</option>
                             </select>
                             <button id="addEventBtn" class="btn-primary font-medium py-2 px-4">
@@ -48,13 +48,11 @@
                     </div>
 
                     <!-- 事件序列控制按钮 -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6">
                         <button id="exportJsonBtn" class="btn-secondary py-2">
                             <i class="fas fa-file-export mr-2"></i>导出事件
                         </button>
-                        <button id="exportAtomicJsonBtn" class="btn-warning py-2 hidden">
-                            <i class="fas fa-file-code mr-2"></i>导出原子事件
-                        </button>                        <label for="importJsonInput" class="btn-secondary py-2 text-center cursor-pointer">
+                        <label for="importJsonInput" class="btn-secondary py-2 text-center cursor-pointer">
                             <i class="fas fa-file-import mr-2"></i>导入单个文件
                         </label>
                         <input type="file" id="importJsonInput" accept=".json" class="hidden">
@@ -65,7 +63,7 @@
                         <button id="clearEventsBtn" class="btn-danger py-2">
                             <i class="fas fa-trash-alt mr-2"></i>清空所有
                         </button>
-                    </div>                    <!-- 事件列表 -->
+                    </div>
                     <div class="panel p-4 mb-6">
                         <div class="flex justify-between items-center mb-3">
                             <h3 class="text-md font-medium text-gray-300 flex items-center">
@@ -78,7 +76,8 @@
                             <button id="selectModeToggleBtn" class="btn-secondary py-1 px-2 text-sm">
                                 <i class="fas fa-check-square mr-2"></i>批量选择
                             </button>
-                            <button id="batchDeleteBtn" class="btn-danger py-1 px-2 text-sm hidden opacity-50 cursor-not-allowed" disabled>
+                            <button id="batchDeleteBtn"
+                                class="btn-danger py-1 px-2 text-sm hidden opacity-50 cursor-not-allowed" disabled>
                                 <i class="fas fa-trash-alt mr-2"></i>批量删除
                             </button>
                         </div>
@@ -139,8 +138,17 @@
                         <div class="flex gap-2">
                             <input type="text" id="websocketUrlInput" value="ws://localhost:3000/ws"
                                 class="input-field flex-1 p-3" placeholder="ws://your-server-address:port">
-                            <button id="connectButton" class="btn-primary font-semibold py-3 px-8 text-lg">
+                            <button id="connectButton" class="btn-primary font-semibold py-3 px-6 text-lg">
                                 <i class="fas fa-plug mr-2"></i>连接到服务器
+                            </button>
+                            <button id="captureBtn" class="btn-info font-semibold py-3 px-4 text-lg" title="捕获单张图片">
+                                <i class="fas fa-camera mr-2"></i>截图
+                            </button>
+                            <button id="controlToggleBtn" class="btn-secondary font-semibold py-3 px-4 text-lg" title="切换键鼠控制">
+                                <i class="fas fa-mouse-pointer mr-2"></i>控制已启用
+                            </button>
+                            <button id="coordToggleBtn" class="btn-secondary font-semibold py-3 px-4 text-lg" title="显示鼠标坐标">
+                                <i class="fas fa-crosshairs mr-2"></i>显示坐标
                             </button>
                         </div>
                     </div>
@@ -184,4 +192,5 @@
     <!-- 使用ES模块方式导入JavaScript文件 -->
     <script type="module" src="js/main.js"></script>
 </body>
+
 </html>

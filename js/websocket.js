@@ -9,6 +9,9 @@ let reconnectTimeout = null;
 let reconnectAttempts = 0;
 let maxReconnectAttempts = 3;
 let reconnectInterval = 2000; // 2秒
+let controlEnabled = true; // 控制是否向远程发送键鼠信号
+let capturedImageUrl = null; // 保存捕获的单张图片
+let coordinateDisplayEnabled = false; // 控制是否显示坐标
 
 // 设置连接状态显示
 function setStatus(message, connectedStatus) {
@@ -44,12 +47,177 @@ function setStatus(message, connectedStatus) {
 
 // 发送控制命令
 function sendControlCommand(command) {
+    if (!controlEnabled) {
+        console.log('控制功能已禁用，命令未发送:', command);
+        return;
+    }
+    
     if (websocket && websocket.readyState === WebSocket.OPEN) {
         websocket.send(JSON.stringify(command));
         console.log('Sent command:', command);
     } else {
         console.warn('WebSocket not connected. Command not sent:', command);
     }
+}
+
+// 捕获单张图片
+function captureScreenshot() {
+    const websocketUrlInput = document.getElementById('websocketUrlInput');
+    const websocketUrl = websocketUrlInput.value;
+    
+    if (!websocketUrl) {
+        addLog('请先设置WebSocket服务器地址', 'error');
+        return;
+    }
+
+    try {
+        // 从WebSocket URL提取主机和端口
+        const wsUrl = new URL(websocketUrl);
+        const host = wsUrl.hostname;
+        const port = wsUrl.port || (wsUrl.protocol === 'wss:' ? '443' : '80');
+        
+        // 构建截图API URL
+        const captureUrl = `http://${host}:${port}/api/capture/MJPG`;
+        
+        addLog('正在请求截图...', 'info');
+        
+        // 发送截图请求
+        fetch(captureUrl)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                // 创建图像URL
+                if (capturedImageUrl) {
+                    URL.revokeObjectURL(capturedImageUrl);
+                }
+                
+                capturedImageUrl = URL.createObjectURL(blob);
+                const remoteDesktopImage = document.getElementById('remoteDesktopImage');
+                remoteDesktopImage.src = capturedImageUrl;
+                
+                addLog('截图成功，图像已更新', 'success');
+            })
+            .catch(error => {
+                console.error('截图请求失败:', error);
+                addLog(`截图失败: ${error.message}`, 'error');
+            });
+            
+    } catch (error) {
+        console.error('解析WebSocket URL失败:', error);
+        addLog(`无法解析服务器地址: ${error.message}`, 'error');
+    }
+}
+
+// 切换控制功能状态
+function toggleControlEnabled() {
+    controlEnabled = !controlEnabled;
+    const controlToggleBtn = document.getElementById('controlToggleBtn');
+    
+    if (controlEnabled) {
+        controlToggleBtn.innerHTML = '<i class="fas fa-mouse-pointer mr-2"></i>控制已启用';
+        controlToggleBtn.className = 'btn-secondary py-2';
+        addLog('键鼠控制功能已启用', 'success');
+    } else {
+        controlToggleBtn.innerHTML = '<i class="fas fa-ban mr-2"></i>控制已禁用';
+        controlToggleBtn.className = 'btn-warning py-2';
+        addLog('键鼠控制功能已禁用', 'warning');
+    }
+    
+    return controlEnabled;
+}
+
+// 获取控制功能状态
+function getControlEnabled() {
+    return controlEnabled;
+}
+
+// 切换坐标显示功能
+function toggleCoordinateDisplay() {
+    coordinateDisplayEnabled = !coordinateDisplayEnabled;
+    const coordToggleBtn = document.getElementById('coordToggleBtn');
+    const remoteDesktopImage = document.getElementById('remoteDesktopImage');
+    
+    if (coordinateDisplayEnabled) {
+        coordToggleBtn.innerHTML = '<i class="fas fa-crosshairs mr-2"></i>坐标已显示';
+        coordToggleBtn.className = 'btn-info font-semibold py-3 px-4 text-lg';
+        addLog('坐标显示功能已启用', 'success');
+        
+        // 添加鼠标移动事件监听
+        remoteDesktopImage.addEventListener('mousemove', showCoordinates);
+        remoteDesktopImage.addEventListener('mouseleave', hideCoordinates);
+    } else {
+        coordToggleBtn.innerHTML = '<i class="fas fa-crosshairs mr-2"></i>显示坐标';
+        coordToggleBtn.className = 'btn-secondary font-semibold py-3 px-4 text-lg';
+        addLog('坐标显示功能已禁用', 'warning');
+        
+        // 移除鼠标移动事件监听
+        remoteDesktopImage.removeEventListener('mousemove', showCoordinates);
+        remoteDesktopImage.removeEventListener('mouseleave', hideCoordinates);
+        hideCoordinates();
+    }
+    
+    return coordinateDisplayEnabled;
+}
+
+// 显示鼠标坐标
+function showCoordinates(event) {
+    const remoteDesktopImage = event.target;
+    const rect = remoteDesktopImage.getBoundingClientRect();
+    
+    // 计算相对于图像的坐标
+    const relativeX = event.clientX - rect.left;
+    const relativeY = event.clientY - rect.top;
+    
+    // 将坐标映射到1920x1080分辨率
+    const mappedX = Math.round((relativeX / rect.width) * 1920);
+    const mappedY = Math.round((relativeY / rect.height) * 1080);
+    
+    // 确保坐标在有效范围内
+    const x = Math.max(0, Math.min(1920, mappedX));
+    const y = Math.max(0, Math.min(1080, mappedY));
+    
+    // 获取或创建坐标显示元素
+    let coordDisplay = document.getElementById('coordinateDisplay');
+    if (!coordDisplay) {
+        coordDisplay = document.createElement('div');
+        coordDisplay.id = 'coordinateDisplay';
+        coordDisplay.style.cssText = `
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: #00ff00;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: monospace;
+            pointer-events: none;
+            z-index: 1000;
+            border: 1px solid #00ff00;
+        `;
+        document.body.appendChild(coordDisplay);
+    }
+    
+    // 更新坐标显示
+    coordDisplay.textContent = `X: ${x}, Y: ${y} (1920x1080)`;
+    coordDisplay.style.left = (event.clientX + 10) + 'px';
+    coordDisplay.style.top = (event.clientY - 25) + 'px';
+    coordDisplay.style.display = 'block';
+}
+
+// 隐藏坐标显示
+function hideCoordinates() {
+    const coordDisplay = document.getElementById('coordinateDisplay');
+    if (coordDisplay) {
+        coordDisplay.style.display = 'none';
+    }
+}
+
+// 获取坐标显示状态
+function getCoordinateDisplayEnabled() {
+    return coordinateDisplayEnabled;
 }
 
 // 连接到WebSocket服务器
@@ -263,5 +431,10 @@ export {
     sendControlCommand,
     getWebsocketState,
     setStatus,
-    initWebsocketUrl
+    initWebsocketUrl,
+    captureScreenshot,
+    toggleControlEnabled,
+    getControlEnabled,
+    toggleCoordinateDisplay,
+    getCoordinateDisplayEnabled
 };
