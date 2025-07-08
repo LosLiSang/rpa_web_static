@@ -3,6 +3,7 @@
 import { eventTypeParams, modKeySet } from './config.js';
 import { addLog, getEventIcon, getEventTypeName, getEventParamsText, sleep } from './utils.js';
 import { sendControlCommand, getWebsocketState } from './websocket.js';
+import { copyToClipboard, showCopyNotification } from './dialog.js';
 
 let events = [];
 let isExecuting = false;
@@ -139,7 +140,7 @@ function addEvent() {
 // 更新事件列表显示
 function updateEventList() {
     const eventList = document.getElementById('eventList');
-    
+
     if (events.length === 0) {
         eventList.innerHTML = `
             <div class="text-center py-10 text-slate-500">
@@ -226,15 +227,15 @@ function updateEventList() {
             controls.appendChild(dragHandle);
             controls.appendChild(editBtn);
             controls.appendChild(deleteBtn);
-        }        div.appendChild(content);
+        } div.appendChild(content);
         div.appendChild(controls);
-        
+
         // 在选择模式下，点击整个事件项切换选择状态
         if (selectMode) {
             div.style.cursor = 'pointer';
             div.onclick = () => toggleEventSelection(index);
         }
-        
+
         eventList.appendChild(div);
     });
 
@@ -245,7 +246,7 @@ function updateEventList() {
 function makeEventListSortable() {
     // 选择模式下不启用拖拽排序
     if (selectMode) return;
-    
+
     const eventList = document.getElementById('eventList');
     let dragSrcIndex = null;
     const items = eventList.querySelectorAll('.event-item');
@@ -307,11 +308,11 @@ function editEvent(index) {
 
     // 设置当前正在编辑的事件索引
     editingEventIndex = index;
-    
+
     // 更改按钮文本为"更新"
     addEventBtn.innerHTML = '<i class="fas fa-edit mr-2"></i>更新';
     addEventBtn.classList.add('editing');
-    
+
     // 高亮被编辑的事件
     const eventItems = document.querySelectorAll('.event-item');
     eventItems.forEach((item, idx) => {
@@ -321,7 +322,7 @@ function editEvent(index) {
             item.classList.remove('editing-item');
         }
     });
-    
+
     addLog(`正在编辑事件 #${index + 1}: ${getEventTypeName(event.type)}`, 'info');
 }
 
@@ -362,42 +363,82 @@ async function executeEvents(removeControlListeners) {
         return;
     }
 
-    if (getWebsocketState() !== WebSocket.OPEN) {
-        alert('请先连接到WebSocket服务器');
+    // 获取WebSocket URL来构建API地址
+    const websocketUrlInput = document.getElementById('websocketUrlInput');
+    const websocketUrl = websocketUrlInput.value;
+    
+    if (!websocketUrl) {
+        alert('请先设置WebSocket服务器地址');
         return;
     }
 
-    isExecuting = true;
-    executionIndex = 0;
-    directControlEnabled = false;
-    addLog(`开始执行事件序列 (共 ${events.length} 个事件)`, 'success');
-    
-    // 如果提供了removeControlListeners函数，则调用它来移除控制监听器
-    if (typeof removeControlListeners === 'function') {
-        removeControlListeners();
-        addLog('已暂时禁用直接控制', 'info');
-    }
-
-    // 更新UI
-    const executeEventsBtn = document.getElementById('executeEventsBtn');
-    const stopExecutionBtn = document.getElementById('stopExecutionBtn');
-    const executionStatus = document.getElementById('executionStatus');
-    const executionStatusText = document.getElementById('executionStatusText');
-    const executionProgress = document.getElementById('executionProgress');
-    const eventProgressText = document.getElementById('eventProgressText');
-    
-    executeEventsBtn.classList.add('hidden');
-    stopExecutionBtn.classList.remove('hidden');
-    executionStatus.classList.remove('hidden');
-    executionStatusText.textContent = '执行中...';
-    eventProgressText.textContent = `0/${events.length}`;
-    executionProgress.style.width = '0%';
-
-    // 移除右侧图像的控制监听器
-    removeControlListeners();
-
     try {
-        await executeNextEvent();
+        // 从WebSocket URL提取主机和端口
+        const wsUrl = new URL(websocketUrl);
+        const host = wsUrl.hostname;
+        const port = wsUrl.port || (wsUrl.protocol === 'wss:' ? '443' : '80');
+        
+        // 构建API URL
+        const apiUrl = `http://${host}:${port}/api/op/seq`;
+        
+        isExecuting = true;
+        executionIndex = 0;
+        directControlEnabled = false;
+        addLog(`开始执行事件序列 (共 ${events.length} 个事件)`, 'success');
+
+        // 如果提供了removeControlListeners函数，则调用它来移除控制监听器
+        if (typeof removeControlListeners === 'function') {
+            removeControlListeners();
+            addLog('已暂时禁用直接控制', 'info');
+        }
+
+        // 更新UI
+        const executeEventsBtn = document.getElementById('executeEventsBtn');
+        const stopExecutionBtn = document.getElementById('stopExecutionBtn');
+        const executionStatus = document.getElementById('executionStatus');
+        const executionStatusText = document.getElementById('executionStatusText');
+        const executionProgress = document.getElementById('executionProgress');
+        const eventProgressText = document.getElementById('eventProgressText');
+
+        executeEventsBtn.classList.add('hidden');
+        stopExecutionBtn.classList.remove('hidden');
+        executionStatus.classList.remove('hidden');
+        executionStatusText.textContent = '正在发送事件序列...';
+        eventProgressText.textContent = `0/${events.length}`;
+        executionProgress.style.width = '50%';
+
+        // 移除右侧图像的控制监听器
+        removeControlListeners();
+
+        // 生成原子事件JSON
+        const atomicEvents = flattenToAtomicEvents();
+        addLog(`已生成 ${atomicEvents.length} 个原子事件，正在发送到服务器...`, 'info');
+
+        // 发送原子事件到服务器
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(atomicEvents)
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        // 更新UI为执行完成状态
+        executionProgress.style.width = '100%';
+        executionStatusText.textContent = '执行完成';
+        eventProgressText.textContent = `${events.length}/${events.length}`;
+
+        addLog(`事件序列执行成功，共发送 ${atomicEvents.length} 个原子事件`, 'success');
+
+        // 等待一段时间后自动恢复UI
+        setTimeout(() => {
+            stopExecution();
+        }, 2000);
+
     } catch (error) {
         console.error('执行事件时出错:', error);
         addLog(`执行事件时出错: ${error.message}`, 'error');
@@ -411,7 +452,7 @@ async function executeNextEvent() {
     const executionProgress = document.getElementById('executionProgress');
     const eventProgressText = document.getElementById('eventProgressText');
     const eventList = document.getElementById('eventList');
-    
+
     if (!isExecuting || executionIndex >= events.length) {
         stopExecution();
         return;
@@ -449,85 +490,6 @@ async function executeNextEvent() {
     }
 }
 
-// 原子事件拆解与执行
-async function executeEventAtomically(event) {
-    switch (event.type) {
-        case 'keySingle':
-            sendControlCommand({ keyPress: { key: [event.params.key], modKey: [] } });
-            await sleep(100);
-            sendControlCommand({ keyRelease: { key: [event.params.key], modKey: [] } });
-            break;
-
-        case 'keyCombo':
-            {
-                const keys = event.params.keys.split(',').map(k => k.trim()).filter(Boolean);
-                const modKey = keys.filter(k => modKeySet.has(k));
-                const filteredKey = keys.filter(k => !modKeySet.has(k));
-
-                sendControlCommand({ keyPress: { modKey: modKey, key: filteredKey } });
-                await sleep(100);
-                sendControlCommand({ keyRelease: { modKey: modKey, key: filteredKey } });
-            }
-            break;
-
-        case 'mouseClick':
-            if (event.params.x !== undefined && event.params.y !== undefined && event.params.x != 0 && event.params.y != 0)
-                sendControlCommand({ mouseMove: { x: Number(event.params.x), y: Number(event.params.y) } });
-            sendControlCommand({ mousePress: [event.params.button] });
-            await sleep(100);
-            sendControlCommand({ mouseRelease: [event.params.button] });
-            break;
-
-        case 'mouseDoubleClick':
-            for (let i = 0; i < 2; i++) {
-                if (event.params.x !== undefined && event.params.y !== undefined && event.params.x != 0 && event.params.y != 0)
-                    sendControlCommand({ mouseMove: { x: Number(event.params.x), y: Number(event.params.y) } });
-                sendControlCommand({ mousePress: [event.params.button] });
-                await sleep(100);
-                sendControlCommand({ mouseRelease: [event.params.button] });
-                await sleep(100);
-            }
-            break;
-
-        case 'mouseDown':
-            if (event.params.x !== undefined && event.params.y !== undefined && event.params.x != 0 && event.params.y != 0)
-                sendControlCommand({ mouseMove: { x: Number(event.params.x), y: Number(event.params.y) } });
-            sendControlCommand({ mousePress: [event.params.button] });
-            break;
-
-        case 'mouseUp':
-            sendControlCommand({ mouseRelease: [event.params.button] });
-            break;
-
-        case 'mouseMove':
-            sendControlCommand({ mouseMove: { x: Number(event.params.x), y: Number(event.params.y) } });
-            break;
-
-        case 'mouseScroll':
-            sendControlCommand({ mouseScroll: Number(event.params.delta) });
-            break;
-
-        case 'mouseDrag':
-            {
-                const duration = Number(event.params.duration) || 100;
-                if (event.params.startX !== undefined && event.params.startY !== undefined)
-                    sendControlCommand({ mouseMove: { x: Number(event.params.startX), y: Number(event.params.startY) } });
-                sendControlCommand({ mousePress: [event.params.button] });
-                if (event.params.endX !== undefined && event.params.endY !== undefined) {
-                    await sleep(duration);
-                    sendControlCommand({ mouseMove: { x: Number(event.params.endX), y: Number(event.params.endY) } });
-                }
-                sendControlCommand({ mouseRelease: [event.params.button] });
-            }
-            break;
-
-        case 'delay':
-            const delayTime = Number(event.params.ms) || 100;
-            addLog(`等待 ${delayTime} 毫秒`, 'info');
-            await sleep(delayTime);
-            break;
-    }
-}
 
 // 停止执行
 function stopExecution() {
@@ -538,7 +500,7 @@ function stopExecution() {
         clearTimeout(executionTimer);
         executionTimer = null;
     }
-    
+
     const executeEventsBtn = document.getElementById('executeEventsBtn');
     const stopExecutionBtn = document.getElementById('stopExecutionBtn');
     const executionStatusText = document.getElementById('executionStatusText');
@@ -556,95 +518,96 @@ function stopExecution() {
     addLog(`事件执行已停止`, 'warning');
 }
 
-// 原子事件拆解函数
+// 原子事件拆解函数 
 function flattenToAtomicEvents() {
     const atomicEvents = [];
     function pushDelay(ms) {
         atomicEvents.push({ delay: ms });
     }
+
     for (const event of events) {
         switch (event.type) {
-            case 'keySingle':
+            case 'singleKeyEnter':
+                atomicEvents.push({ singleKeyEnter: event.params.key });
+                break;
+
+            case 'combindKeyEnter':
+                const modKeys = event.params.modKey ? event.params.modKey.split(' ').filter(k => k.trim()) : [];
+                const keys = event.params.key ? event.params.key.split(' ').filter(k => k.trim()) : [];
                 atomicEvents.push({
-                    keyPress: { modKey: [], key: [event.params.key] }
-                });
-                pushDelay(100);
-                atomicEvents.push({
-                    keyRelease: { modKey: [], key: [event.params.key] }
+                    combindKeyEnter: {
+                        modKey: modKeys,
+                        key: keys
+                    }
                 });
                 break;
-            case 'keyCombo': {
-                const keys = event.params.keys.split(',').map(k => k.trim()).filter(Boolean);
-                const modKey = keys.filter(k => modKeySet.has(k));
-                const filteredKey = keys.filter(k => !modKeySet.has(k));
-                atomicEvents.push({
-                    keyPress: { modKey: modKey, key: filteredKey }
-                });
-                pushDelay(100);
-                atomicEvents.push({
-                    keyRelease: { modKey: modKey, key: filteredKey }
-                });
-                break;
-            }
+
             case 'mouseClick':
-                if (event.params.x !== undefined && event.params.y !== undefined)
-                    atomicEvents.push({ mouseMove: { x: Number(event.params.x), y: Number(event.params.y) } });
-                atomicEvents.push({ mousePress: [event.params.button] });
-                pushDelay(100);
-                atomicEvents.push({ mouseRelease: [event.params.button] });
+                atomicEvents.push({ mouseClick: event.params.button });
                 break;
-            case 'mouseDoubleClick':
-                for (let i = 0; i < 2; i++) {
-                    if (event.params.x !== undefined && event.params.y !== undefined)
-                        atomicEvents.push({ mouseMove: { x: Number(event.params.x), y: Number(event.params.y) } });
-                    atomicEvents.push({ mousePress: [event.params.button] });
-                    pushDelay(100);
-                    atomicEvents.push({ mouseRelease: [event.params.button] });
-                    pushDelay(100);
-                }
+
+            case 'stringEnter':
+                atomicEvents.push({ stringEnter: event.params.text });
                 break;
-            case 'mouseDown':
-                if (event.params.x !== undefined && event.params.y !== undefined)
-                    atomicEvents.push({ mouseMove: { x: Number(event.params.x), y: Number(event.params.y) } });
-                atomicEvents.push({ mousePress: [event.params.button] });
+
+            case 'stringEnterGb2312':
+                atomicEvents.push({ stringEnterGb2312: event.params.text });
                 break;
-            case 'mouseUp':
-                atomicEvents.push({ mouseRelease: [event.params.button] });
-                break;
+
             case 'mouseMove':
-                atomicEvents.push({ mouseMove: { x: Number(event.params.x), y: Number(event.params.y) } });
+                atomicEvents.push({
+                    mouseMove: {
+                        x: Number(event.params.x),
+                        y: Number(event.params.y)
+                    }
+                });
                 break;
+
             case 'mouseScroll':
-                atomicEvents.push({ mouseScroll: { delta: Number(event.params.delta) } });
+                atomicEvents.push({ mouseScroll: Number(event.params.delta) });
                 break;
-            case 'mouseDrag': {
-                const duration = Number(event.params.duration) || 100;
-                if (event.params.startX !== undefined && event.params.startY !== undefined)
-                    atomicEvents.push({ mouseMove: { x: Number(event.params.startX), y: Number(event.params.startY) } });
-                atomicEvents.push({ mousePress: [event.params.button] });
-                if (event.params.endX !== undefined && event.params.endY !== undefined) {
-                    pushDelay(duration);
-                    atomicEvents.push({ mouseMove: { x: Number(event.params.endX), y: Number(event.params.endY) } });
-                }
-                atomicEvents.push({ mouseRelease: [event.params.button] });
-                break;
-            }
+
             case 'delay':
                 pushDelay(Number(event.params.ms) || 100);
                 break;
         }
     }
+
     return atomicEvents;
 }
 
-// 导出为原子event的JSON
-function exportAtomicJson() {
-    if (events.length === 0) {
-        alert('没有事件可导出');
-        return;
+// 复制原子事件到粘贴板
+async function copyAtomicEventsToClipboard() {
+    try {
+        const atomicEvents = flattenToAtomicEvents();
+        const formattedJson = '[\n' + 
+            atomicEvents.map(event => '    ' + JSON.stringify(event)).join(',\n') + 
+            '\n]';
+        
+        const success = await copyToClipboard(formattedJson);
+        if (success) {
+            showCopyNotification(true, `已复制 ${atomicEvents.length} 个原子事件到粘贴板`);
+            addLog('已复制原子事件到粘贴板', 'success');
+        } else {
+            showCopyNotification(false, '复制到粘贴板失败');
+            addLog('复制到粘贴板失败', 'error');
+        }
+    } catch (err) {
+        showCopyNotification(false, '复制过程中出现错误');
+        addLog(`复制失败: ${err.message}`, 'error');
     }
+}
+
+// 导出原子JSON
+function exportAtomicJson() {
     const atomicEvents = flattenToAtomicEvents();
-    const blob = new Blob([JSON.stringify(atomicEvents, null, 2)], { type: 'application/json' });
+    
+    // 格式化为紧凑的JSON数组格式，每个对象一行
+    const formattedJson = '[\n' + 
+        atomicEvents.map(event => '    ' + JSON.stringify(event)).join(',\n') + 
+        '\n]';
+    
+    const blob = new Blob([formattedJson], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
 
     const a = document.createElement('a');
@@ -655,194 +618,19 @@ function exportAtomicJson() {
     document.body.removeChild(a);
 
     URL.revokeObjectURL(url);
-    addLog('已导出事件序列为原子JSON文件', 'success');
+    addLog('已导出原子事件序列为JSON文件', 'success');
 }
 
-// 导出当前编排事件为JSON
-function exportJson() {
-    if (events.length === 0) {
-        alert('没有事件可导出');
-        return;
-    }
 
-    const data = {
-        version: "1.0",
-        events
-    };
 
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
 
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `remote_desktop_events_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-
-    URL.revokeObjectURL(url);
-    addLog('已导出事件序列为JSON文件', 'success');
-}
-
-// 判断是否是原子事件
-function isAtomicEvent(event) {
-    // 原子事件直接包含键盘、鼠标操作或延迟
-    return event && (
-        event.keyPress !== undefined ||
-        event.keyRelease !== undefined ||
-        event.mouseMove !== undefined ||
-        event.mousePress !== undefined ||
-        event.mouseRelease !== undefined ||
-        event.mouseScroll !== undefined ||
-        event.delay !== undefined
-    );
-}
-
-// 原子事件转换为高级事件
-function convertAtomicToHighLevelEvents(atomicEvents) {
-    if (!Array.isArray(atomicEvents) || atomicEvents.length === 0) {
-        return [];
-    }
-    
-    const highLevelEvents = [];
-    let i = 0;
-    
-    while (i < atomicEvents.length) {
-        const current = atomicEvents[i];
-        
-        // 处理键盘事件
-        if (current.keyPress && i + 1 < atomicEvents.length && atomicEvents[i+1].keyRelease) {
-            // 检查是否是组合键
-            if (current.keyPress.modKey && current.keyPress.modKey.length > 0) {
-                const keys = [...current.keyPress.modKey, ...(current.keyPress.key || [])].join(',');
-                highLevelEvents.push({
-                    id: Date.now() + Math.random(),
-                    type: 'keyCombo',
-                    params: { keys }
-                });
-            } else if (current.keyPress.key && current.keyPress.key.length === 1) {
-                highLevelEvents.push({
-                    id: Date.now() + Math.random(),
-                    type: 'keySingle',
-                    params: { key: current.keyPress.key[0] }
-                });
-            }
-            i += 2; // 跳过press和release
-            
-            // 跳过延迟
-            if (i < atomicEvents.length && atomicEvents[i].delay) i++;
-            
-            continue;
-        }
-        
-        // 处理鼠标点击
-        if (current.mousePress && i + 1 < atomicEvents.length && atomicEvents[i+1].mouseRelease) {
-            // 检查是否有之前的mouseMove
-            let x, y;
-            if (i > 0 && atomicEvents[i-1].mouseMove) {
-                x = atomicEvents[i-1].mouseMove.x;
-                y = atomicEvents[i-1].mouseMove.y;
-            }
-            
-            highLevelEvents.push({
-                id: Date.now() + Math.random(),
-                type: 'mouseClick',
-                params: { 
-                    button: current.mousePress[0],
-                    x,
-                    y
-                }
-            });
-            
-            i += 2; // 跳过press和release
-            
-            // 跳过延迟
-            if (i < atomicEvents.length && atomicEvents[i].delay) i++;
-            
-            continue;
-        }
-        
-        // 处理鼠标移动
-        if (current.mouseMove && 
-            (i === 0 || !atomicEvents[i-1].mousePress) && 
-            (i === atomicEvents.length-1 || !atomicEvents[i+1].mousePress)) {
-            
-            highLevelEvents.push({
-                id: Date.now() + Math.random(),
-                type: 'mouseMove',
-                params: { 
-                    x: current.mouseMove.x,
-                    y: current.mouseMove.y
-                }
-            });
-            
-            i++; // 移动到下一个事件
-            continue;
-        }
-        
-        // 处理鼠标拖拽
-        if (current.mouseMove && i + 2 < atomicEvents.length && 
-            atomicEvents[i+1].mousePress && 
-            atomicEvents[i+2].mouseMove &&
-            i + 3 < atomicEvents.length && atomicEvents[i+3].mouseRelease) {
-            
-            highLevelEvents.push({
-                id: Date.now() + Math.random(),
-                type: 'mouseDrag',
-                params: { 
-                    button: atomicEvents[i+1].mousePress[0],
-                    startX: current.mouseMove.x,
-                    startY: current.mouseMove.y,
-                    endX: atomicEvents[i+2].mouseMove.x,
-                    endY: atomicEvents[i+2].mouseMove.y
-                }
-            });
-            
-            i += 4; // 跳过这个序列
-            continue;
-        }
-        
-        // 处理鼠标滚轮
-        if (current.mouseScroll) {
-            highLevelEvents.push({
-                id: Date.now() + Math.random(),
-                type: 'mouseScroll',
-                params: { 
-                    delta: typeof current.mouseScroll === 'number' 
-                        ? current.mouseScroll 
-                        : current.mouseScroll.delta
-                }
-            });
-            
-            i++; // 下一个事件
-            continue;
-        }
-        
-        // 处理延迟
-        if (current.delay) {
-            highLevelEvents.push({
-                id: Date.now() + Math.random(),
-                type: 'delay',
-                params: { ms: current.delay }
-            });
-            
-            i++; // 下一个事件
-            continue;
-        }
-        
-        // 默认情况：无法识别的原子事件，简单跳过
-        i++;
-    }
-    
-    return highLevelEvents;
-}
 
 // 处理导入的JSON数据
 function processJsonData(jsonData, fileName = '') {
     try {
         let importedEvents = [];
         let isAtomicImport = false;
-        
+
         // 判断数据格式
         if (Array.isArray(jsonData.events)) {
             // 高级事件格式 {version, events}
@@ -860,7 +648,7 @@ function processJsonData(jsonData, fileName = '') {
         } else {
             throw new Error('导入的JSON格式不正确');
         }
-        
+
         return {
             events: importedEvents,
             isAtomicImport,
@@ -881,7 +669,7 @@ function importJson(file) {
         try {
             const data = JSON.parse(e.target.result);
             const processedData = processJsonData(data, file.name);
-            
+
             if (confirm('是否要替换当前事件列表？点击"确定"替换，点击"取消"追加。')) {
                 events = processedData.events;
             } else {
@@ -891,7 +679,7 @@ function importJson(file) {
             updateEventList();
             updateEventCount();
             updateEventParams();
-            
+
             if (processedData.isAtomicImport) {
                 addLog(`成功导入并转换为高级事件，共 ${processedData.count} 个事件`, 'success');
             } else {
@@ -912,35 +700,35 @@ function batchImportJson(files) {
 
     // 询问是替换还是追加
     const shouldReplace = confirm('是否要替换当前事件列表？点击"确定"替换，点击"取消"追加。');
-    
+
     // 如果选择替换，先清空当前事件
     if (shouldReplace) {
         events = [];
     }
-    
+
     const totalFiles = files.length;
     let processedFiles = 0;
     let successfulImports = 0;
     let totalEventsImported = 0;
-    
+
     addLog(`开始批量导入 ${totalFiles} 个文件...`, 'info');
-    
+
     // 创建一个处理文件的函数，它返回一个Promise
     function processFile(file) {
         return new Promise((resolve) => {
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = function (e) {
                 try {
                     const data = JSON.parse(e.target.result);
                     const processedData = processJsonData(data, file.name);
-                    
+
                     // 将处理后的事件添加到events数组中
                     events = events.concat(processedData.events);
-                    
+
                     // 更新统计信息
                     successfulImports++;
                     totalEventsImported += processedData.events.length;
-                    
+
                     addLog(`成功导入 "${file.name}"，包含 ${processedData.events.length} 个事件`, 'success');
                     resolve(true);
                 } catch (err) {
@@ -948,23 +736,23 @@ function batchImportJson(files) {
                     resolve(false);
                 }
             };
-            
-            reader.onerror = function() {
+
+            reader.onerror = function () {
                 addLog(`读取文件 "${file.name}" 时出错`, 'error');
                 resolve(false);
             };
-            
+
             reader.readAsText(file);
         });
     }
-    
+
     // 使用Promise.all来处理所有文件
     const promises = Array.from(files).map(processFile);
     Promise.all(promises).then(() => {
         updateEventList();
         updateEventCount();
         updateEventParams();
-        
+
         addLog(`批量导入完成：成功导入 ${successfulImports}/${totalFiles} 个文件，总共 ${totalEventsImported} 个事件`, 'info');
     });
 }
@@ -1001,11 +789,11 @@ function toggleSelectMode() {
     selectMode = !selectMode;
     selectedEvents.clear(); // 清空已选择的事件
     updateEventList(); // 更新事件列表UI
-    
+
     // 更新批量操作按钮状态
     const batchDeleteBtn = document.getElementById('batchDeleteBtn');
     const selectModeToggleBtn = document.getElementById('selectModeToggleBtn');
-    
+
     if (selectMode) {
         selectModeToggleBtn.classList.add('active');
         selectModeToggleBtn.innerHTML = '<i class="fas fa-times mr-2"></i>取消选择';
@@ -1027,7 +815,7 @@ function toggleEventSelection(index) {
         selectedEvents.add(index);
     }
     updateEventList();
-    
+
     // 更新删除按钮状态
     const batchDeleteBtn = document.getElementById('batchDeleteBtn');
     if (selectedEvents.size > 0) {
@@ -1042,20 +830,20 @@ function toggleEventSelection(index) {
 // 批量删除选中的事件
 function batchDeleteEvents() {
     if (selectedEvents.size === 0) return;
-    
+
     if (confirm(`确认删除选中的 ${selectedEvents.size} 个事件?`)) {
         // 将选中的索引转换为数组并降序排列，这样从大到小删除不会影响索引
         const indexesToDelete = Array.from(selectedEvents).sort((a, b) => b - a);
-        
+
         for (const index of indexesToDelete) {
             events.splice(index, 1);
         }
-        
+
         addLog(`批量删除了 ${selectedEvents.size} 个事件`, 'warning');
         selectedEvents.clear();
         updateEventList();
         updateEventCount();
-        
+
         // 如果没有事件了，退出选择模式
         if (events.length === 0) {
             toggleSelectMode();
@@ -1071,7 +859,8 @@ export {
     executeEvents,
     stopExecution,
     exportAtomicJson,
-    exportJson,
+    copyAtomicEventsToClipboard,
+    
     importJson,
     batchImportJson,
     getDirectControlStatus,

@@ -19,15 +19,13 @@ function addLog(message, type = 'info') {
 // 获取事件图标
 function getEventIcon(type) {
     const icons = {
-        keySingle: '<i class="fas fa-key"></i>',
-        keyCombo: '<i class="fas fa-keyboard"></i>',
+        singleKeyEnter: '<i class="fas fa-key"></i>',
+        combindKeyEnter: '<i class="fas fa-keyboard"></i>',
         mouseClick: '<i class="fas fa-mouse-pointer"></i>',
-        mouseDoubleClick: '<i class="fas fa-mouse"></i>',
-        mouseDown: '<i class="fas fa-hand-pointer"></i>',
-        mouseUp: '<i class="fas fa-hand-point-up"></i>',
+        stringEnter: '<i class="fas fa-edit"></i>',
+        stringEnterGb2312: '<i class="fas fa-language"></i>',
         mouseMove: '<i class="fas fa-arrows-alt"></i>',
         mouseScroll: '<i class="fas fa-mouse"></i>',
-        mouseDrag: '<i class="fas fa-arrows-alt-h"></i>',
         delay: '<i class="fas fa-hourglass-half"></i>'
     };
     return icons[type] || '<i class="fas fa-question-circle"></i>';
@@ -36,15 +34,13 @@ function getEventIcon(type) {
 // 获取事件类型的中文名称
 function getEventTypeName(type) {
     const names = {
-        keySingle: '按下单个按键',
-        keyCombo: '执行组合按键',
+        singleKeyEnter: '按下单个按键',
+        combindKeyEnter: '执行组合按键',
         mouseClick: '鼠标单击',
-        mouseDoubleClick: '鼠标双击',
-        mouseDown: '鼠标按下',
-        mouseUp: '鼠标松开',
+        stringEnter: '输入字符串',
+        stringEnterGb2312: '输入中文字符串',
         mouseMove: '鼠标移动',
         mouseScroll: '鼠标滚轮',
-        mouseDrag: '鼠标拖拽',
         delay: '延迟'
     };
     return names[type] || type;
@@ -56,26 +52,22 @@ function getEventParamsText(type, params) {
     const buttonNames = { mleft: '左键', mright: '右键', mmiddle: '中键' };
 
     switch (type) {
-        case 'keySingle':
+        case 'singleKeyEnter':
             return `按键: ${params.key}`;
-        case 'keyCombo':
-            return `组合键: ${params.keys}`;
+        case 'combindKeyEnter':
+            return `按键: ${params.key}` + 
+                (params.modKey ? `，修饰键: ${params.modKey}` : '');
         case 'mouseClick':
-        case 'mouseDoubleClick':
-        case 'mouseDown':
             return `按钮: ${buttonNames[params.button] || params.button}` +
                 (params.x !== undefined && params.y !== undefined ? `，坐标: (${params.x}, ${params.y})` : '');
-        case 'mouseUp':
-            return `按钮: ${buttonNames[params.button] || params.button}`;
+        case 'stringEnter':
+            return `输入内容: ${params.text}`;
+        case 'stringEnterGb2312':
+            return `输入中文: ${params.text}`;
         case 'mouseMove':
             return `坐标: (${params.x}, ${params.y})`;
         case 'mouseScroll':
             return `滚动值: ${params.delta}`;
-        case 'mouseDrag':
-            return `按钮: ${buttonNames[params.button] || params.button}` +
-                (params.startX !== undefined && params.startY !== undefined ? `，起点: (${params.startX}, ${params.startY})` : '') +
-                (params.endX !== undefined && params.endY !== undefined ? `，终点: (${params.endX}, ${params.endY})` : '') +
-                (params.duration ? `，持续: ${params.duration}ms` : '');
         case 'delay':
             return `延迟: ${params.ms || 100}ms`;
         default:
