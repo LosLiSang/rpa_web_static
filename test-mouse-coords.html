@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>鼠标坐标测试</title>
+    <style>
+        body {
+            margin: 20px;
+            font-family: monospace;
+        }
+        #test-image {
+            border: 2px solid #333;
+            background: #f0f0f0;
+            cursor: crosshair;
+            width: 400px;
+            height: 300px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .result {
+            margin: 10px 0;
+            padding: 10px;
+            background: #e0f0e0;
+            border-radius: 4px;
+        }
+        .error {
+            background: #ffe0e0;
+        }
+    </style>
+</head>
+<body>
+    <h1>鼠标坐标计算测试</h1>
+
+    <div id="test-image">
+        <span>测试区域 (400x300)</span>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        const testImage = document.getElementById('test-image');
+        const results = document.getElementById('results');
+
+        function addResult(message, isError = false) {
+            const div = document.createElement('div');
+            div.className = 'result' + (isError ? ' error' : '');
+            div.textContent = message;
+            results.appendChild(div);
+        }
+
+        testImage.addEventListener('mousemove', (event) => {
+            const rect = testImage.getBoundingClientRect();
+
+            // 修复后的正确计算
+            const correctX = event.clientX - rect.left;
+            const correctY = event.clientY - rect.top;
+
+            // 修复前的错误计算
+            const errorX = event.clientX - (event.clientX - event.target.getBoundingClientRect().left);
+            const errorY = event.clientY - (event.clientY - event.target.getBoundingClientRect().top);
+
+            results.innerHTML = '';
+            addResult(`鼠标客户端坐标: (${event.clientX}, ${event.clientY})`);
+            addResult(`图像左上角位置: (${rect.left.toFixed(0)}, ${rect.top.toFixed(0)})`);
+            addResult(`---`);
+            addResult(`✓ 正确计算: (${correctX.toFixed(0)}, ${correctY.toFixed(0)})`);
+            addResult(`✗ 错误计算: (${errorX.toFixed(0)}, ${errorY.toFixed(0)})`, errorX === errorY);
+        });
+
+        testImage.addEventListener('mouseleave', () => {
+            results.innerHTML = '<div class="result">鼠标移出区域</div>';
+        });
+
+        addResult('移动鼠标到测试区域查看坐标计算结果');
+    </script>
+</body>
+</html>

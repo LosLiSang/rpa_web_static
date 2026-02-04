@@ -96,8 +96,11 @@ function handleMouseMove(event) {
         offsetY = 0;
     }
 
-    const mouseX = event.clientX - (event.clientX - event.target.getBoundingClientRect().left);
-    const mouseY = event.clientY - (event.clientY - event.target.getBoundingClientRect().top);
+    // 获取鼠标相对于图像的位置
+    const rect = remoteDesktopImage.getBoundingClientRect();
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
+
     const relativeToContentX = mouseX - offsetX;
     const relativeToContentY = mouseY - offsetY;
 
