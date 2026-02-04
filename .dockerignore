@@ -1,0 +1,41 @@
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# 文档
+README.md
+AGENTS.md
+
+# 脚本文件
+start_server.sh
+start_server.bat
+
+# Docker 相关（避免循环）
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# 配置文件（如果不需要）
+tsconfig.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# 测试
+coverage/
+*.test.js

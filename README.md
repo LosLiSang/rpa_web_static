@@ -69,3 +69,70 @@
 2. 输入WebSocket服务器地址并连接
 3. 可以开始添加控制事件或直接通过远程桌面图像控制
 4. 使用录制功能可以自动创建事件序列
+
+## Docker 部署
+
+本项目支持使用 Docker 和 Nginx 进行部署，提供了更轻量、更高性能的生产环境解决方案。
+
+### 构建镜像
+
+```bash
+docker build -t rpa-web-static .
+```
+
+### 运行容器
+
+#### 使用默认端口 (34567)
+
+```bash
+docker run -d -p 34567:34567 --name rpa-web rpa-web-static
+```
+
+#### 使用自定义端口
+
+通过环境变量 `PORT` 配置端口：
+
+```bash
+docker run -d -p 8080:8080 -e PORT=8080 --name rpa-web rpa-web-static
+```
+
+### 容器管理
+
+```bash
+# 查看日志
+docker logs rpa-web
+
+# 停止容器
+docker stop rpa-web
+
+# 删除容器
+docker rm rpa-web
+
+# 删除镜像
+docker rmi rpa-web-static
+```
+
+### 上传到服务器
+
+```bash
+docker save rpa-web-static | gzip > rpa-web-static.tar.gz
+scp rpa-web-static.tar.gz user@server:/path/to/upload
+ssh user@server
+gunzip -c /path/to/upload/rpa-web-static.tar.gz | docker load
+```
+
+### 环境变量
+
+| 变量名 | 默认值 | 说明 |
+|--------|--------|------|
+| PORT | 34567 | 服务监听端口 |
+
+### 功能特性
+
+- ✅ 默认端口 34567
+- ✅ 通过环境变量 PORT 配置端口
+- ✅ Gzip 压缩优化传输
+- ✅ 静态资源缓存
+- ✅ 安全头设置
+- ✅ 轻量级 alpine 镜像
+- ✅ 功能等效于 Node.js 服务器，性能更优

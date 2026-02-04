@@ -50,7 +50,13 @@ const modKeySet = new Set([
 ]);
 
 // 鼠标移动间隔时间配置
-const MOUSE_MOVE_INTERVAL_MS = 100;
+const MOUSE_MOVE_INTERVAL_MS = 500;
+
+// 鼠标位置变化阈值（像素）
+const MOUSE_MOVE_THRESHOLD_PX = 3;
+
+// handleMouseMove 节流时间（毫秒）
+const MOUSE_MOVE_THROTTLE_MS = 16;
 
 // 导出模块
-export { eventTypeParams, modKeySet, MOUSE_MOVE_INTERVAL_MS };
+export { eventTypeParams, modKeySet, MOUSE_MOVE_INTERVAL_MS, MOUSE_MOVE_THRESHOLD_PX, MOUSE_MOVE_THROTTLE_MS };
