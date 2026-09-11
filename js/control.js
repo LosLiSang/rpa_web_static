@@ -140,11 +140,13 @@ function handleMouseMove(event) {
     }
 
     // 更新坐标显示
-    if (visible) {
-        mouseCoordDisplay.textContent = `(${showX}, ${showY})`;
-        mouseCoordDisplay.style.display = 'flex';
-    } else {
-        mouseCoordDisplay.style.display = 'none';
+    if (mouseCoordDisplay) {
+        if (visible) {
+            mouseCoordDisplay.textContent = `(${showX}, ${showY})`;
+            mouseCoordDisplay.style.display = 'flex';
+        } else {
+            mouseCoordDisplay.style.display = 'none';
+        }
     }
 }
 
